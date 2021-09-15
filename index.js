@@ -12,26 +12,26 @@ class LogicalTree {
     this.bundled = !!opts.bundled
     this.resolved = opts.resolved
     this.integrity = opts.integrity
-    this.dependencies = new Map()
+    this.dependencies = {}
     this.requiredBy = new Set()
   }
 
   get isRoot () { return !this.requiredBy.size }
 
   addDep (dep) {
-    this.dependencies.set(dep.name, dep)
+    this.dependencies[dep.name] = dep
     dep.requiredBy.add(this)
     return this
   }
 
   delDep (dep) {
-    this.dependencies.delete(dep.name)
+    delete this.dependencies[dep.name]
     dep.requiredBy.delete(this)
     return this
   }
 
   getDep (name) {
-    return this.dependencies.get(name)
+    return this.dependencies[dep.name]
   }
 
   path (prefix) {
@@ -54,7 +54,8 @@ class LogicalTree {
   hasCycle (_seen, _from) {
     if (!_seen) { _seen = new Set() }
     if (!_from) { _from = this }
-    for (let dep of this.dependencies.values()) {
+    for (let key in this.dependencies) {
+      const dep = this.dependencies[key];
       if (_seen.has(dep)) { continue }
       _seen.add(dep)
       if (dep === _from || dep.hasCycle(_seen, _from)) {
@@ -74,7 +75,7 @@ class LogicalTree {
     const pending = P.resolve().then(() => {
       return fn(this, () => {
         return promiseMap(
-          this.dependencies.values(),
+          Object.values(this.dependencies),
           dep => dep.forEachAsync(fn, opts, _pending),
           opts
         )
@@ -84,15 +85,15 @@ class LogicalTree {
     return pending
   }
 
-  forEach (fn, _seen) {
+  forEach (fn, _seen, path = []) {
     if (!_seen) { _seen = new Set() }
     if (_seen.has(this)) { return }
     _seen.add(this)
     fn(this, () => {
-      for (let dep of this.dependencies.values()) {
-        dep.forEach(fn, _seen)
+      for (let key in this.dependencies) {
+        this.dependencies[key].forEach(fn, _seen, path.concat([this]))
       }
-    })
+    }, path)
   }
 }
 
@@ -127,6 +128,9 @@ function addChild (dep, tree, allDeps, pkgLock) {
   const lockNode = atAddr(pkgLock, addr)
   Object.keys(lockNode.requires || {}).forEach(name => {
     const tdepAddr = reqAddr(pkgLock, name, addr)
+    tdep = makeNode(name, tdepAddr, atAddr(pkgLock, tdepAddr))
+    addChild(tdep, dep, allDeps, pkgLock)
+    /* this would deduplicate "transitive" deps
     let tdep = allDeps.get(tdepAddr)
     if (!tdep) {
       tdep = makeNode(name, tdepAddr, atAddr(pkgLock, tdepAddr))
@@ -134,6 +138,7 @@ function addChild (dep, tree, allDeps, pkgLock) {
     } else {
       dep.addDep(tdep)
     }
+    */
   })
 }
 
