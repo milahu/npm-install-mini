@@ -123,7 +123,7 @@ export function addChild (dep, tree, allDeps, pkgLock) {
   const lockNode = atAddr(pkgLock, addr)
   Object.keys(lockNode.requires || {}).forEach(name => {
     const tdepAddr = reqAddr(pkgLock, name, addr)
-    tdep = makeNode(name, tdepAddr, atAddr(pkgLock, tdepAddr))
+    const tdep = makeNode(name, tdepAddr, atAddr(pkgLock, tdepAddr))
     addChild(tdep, dep, allDeps, pkgLock)
     /* this would deduplicate "transitive" deps
     let tdep = allDeps.get(tdepAddr)
