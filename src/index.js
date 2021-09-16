@@ -30,10 +30,12 @@ const unpack = (archive, to) => {
   ]);
 };
 
-const symlink = (from, to) => {
-  mkdir(path.dirname(to));
-  debug(`symlink: ${from} -> ${to}`);
-  fs.symlinkSync(from, to);
+// "fix" the order of arguments
+// in linux terminal, when i say `ln a b`, then ln will add a link from a to b
+const symlink = (linkPath, linkTarget) => {
+  mkdir(path.dirname(linkPath));
+  debug(`symlink: ${linkPath} -> ${linkTarget}`);
+  fs.symlinkSync(linkTarget, linkPath);
 };
 
 function npm_install_mini() {
@@ -97,8 +99,9 @@ function npm_install_mini() {
       : `node_modules/${store_dir}/${parent.name}@${parent.version}/node_modules/${dep.name}`
     );
     
-    const dep_link = (isRootDop
-      ? `${store_dir}/${dep.name}@${dep.version}/node_modules/${dep.name}`
+    // we need ../../ (not ../) cos the linkPath is treated as directory (not file)
+    const dep_target = (dep.name.includes('/') ? '../../' : '') + (isRootDep
+        ? `${store_dir}/${dep.name}@${dep.version}/node_modules/${dep.name}`
       : `../../${dep.name}@${dep.version}/node_modules/${dep.name}`
     );
 
@@ -110,7 +113,7 @@ function npm_install_mini() {
       version: dep.version,
       parents: path.map(dep => `${dep.name}@${dep.version}`),
       unpack: [tgzpath, dep_store],
-      symlink: [dep_link, dep_path],
+      symlink: [dep_target, dep_path],
     });
     */
 
@@ -123,16 +126,16 @@ function npm_install_mini() {
     }
 
     if (!fs.existsSync(dep_path)) {
-      symlink(dep_link, dep_path);
+      symlink(dep_path, dep_target);
     }
     else {
       // symlink exists
-      const old_link = fs.readlinkSync(dep_path);
-      if (old_link != dep_link) {
+      const old_target = fs.readlinkSync(dep_path);
+      if (old_target != dep_target) {
         throw [
           `ERROR symlink collision`,
-          `old symlink: ${dep_path} -> ${old_link}`,
-          `new symlink: ${dep_path} -> ${dep_link}`,
+          `old symlink: ${dep_path} -> ${old_target}`,
+          `new symlink: ${dep_path} -> ${dep_target}`,
         ].join('\n');
       }
     }
@@ -143,16 +146,16 @@ function npm_install_mini() {
       const pkg = json(`${dep_store}/package.json`);
       const deep_dir = `node_modules/${store_dir}/${dep.name}@${dep.version}/node_modules/${dep.name}`;
       if (typeof pkg.bin == 'string') {
-        symlink(`${dep_store_rel}/${pkg.bin}`, `node_modules/.bin/${dep.name}`)
-        symlink(`../../${pkg.bin}`, `${deep_dir}/node_modules/.bin/${dep.name}`)
+        symlink(`node_modules/.bin/${dep.name}`, `${dep_store_rel}/${pkg.bin}`)
+        symlink(`${deep_dir}/node_modules/.bin/${dep.name}`, `../../${pkg.bin}`)
         chmod(`${dep_store}/${pkg.bin}`, 0o755) // fix permissions. required for patchShebangs in nixos
       }
       else if (typeof pkg.bin == 'object') {
         for (const binName of Object.keys(pkg.bin)) {
           // TODO resolve realpath for link target
           // pkg.bin[binName] can be ./cli.js -> should be only cli.js
-          symlink(`${dep_store_rel}/${pkg.bin[binName]}`, `node_modules/.bin/${binName}`); // TODO handle collisions
-          symlink(`../../${pkg.bin[binName]}`, `${deep_dir}/node_modules/.bin/${binName}`); // TODO handle collisions
+          symlink(`node_modules/.bin/${binName}`, `${dep_store_rel}/${pkg.bin[binName]}`); // TODO handle collisions
+          symlink(`${deep_dir}/node_modules/.bin/${binName}`, `../../${pkg.bin[binName]}`); // TODO handle collisions
           chmod(`${dep_store}/${pkg.bin[binName]}`, 0o755) // fix permissions. required for patchShebangs in nixos
         }
       }
