@@ -97,7 +97,7 @@ class LogicalTree {
   }
 }
 
-module.exports = lockTree
+module.exports.lockTree = lockTree
 function lockTree (pkg, pkgLock, opts) {
   const tree = makeNode(pkg.name, null, pkg)
   const allDeps = new Map()
