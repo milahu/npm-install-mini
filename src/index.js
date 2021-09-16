@@ -42,6 +42,7 @@ function npm_install_mini() {
 
   const pkg = json('package.json');
   const pkgLock = json('package-lock.json');
+  const preInstallLinks = JSON.parse(process.env.NODE_preInstallLinks || 'null'); // passed by npmlock2nix
 
   // header
   console.log(`${pkg.name}@${pkg.version}: install NPM dependencies`)
@@ -162,6 +163,19 @@ function npm_install_mini() {
     }
 
     recurse();
+
+    if (dep.name in preInstallLinks) {
+      // symlink files from /nix/store
+      for (const linkPath in preInstallLinks[dep.name]) {
+        const linkTarget = preInstallLinks[dep.name][linkPath];
+        console.log(`> ${dep.name}@${dep.version}: add symlink from preInstallLinks: ${linkPath} -> ${linkTarget}`)
+        if (fs.existsSync(`${dep_store}/${linkPath}`)) {
+          console.log(`> remove existing file ${dep_store}/${linkPath}`)
+          fs.unlinkSync(`${dep_store}/${linkPath}`); // TODO also 'rm -rf' directories
+        }
+        symlink(`${dep_store}/${linkPath}`, linkTarget); // TODO handle collisions
+      }
+    }
 
     // run lifecycle scripts for dependency
     // run scripts after recurse, so that child-dependencies are installed
