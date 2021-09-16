@@ -187,7 +187,7 @@ function npm_install_mini() {
       if (pkg.scripts) {
         for (const scriptName of ['preinstall', 'install', 'postinstall']) {
           if (!(scriptName in pkg.scripts)) continue;
-          console.log(`> ${pkg.name}@${pkg.version} ${scriptName}`)
+          console.log(`> ${pkg.name}@${pkg.version} ${scriptName}: ${pkg.scripts[scriptName]}`)
 
           // quick n dirty. we use npm to resolve binary paths. we could use require.resolve
           const spawnResult = spawn(['npm', 'run', scriptName], {
