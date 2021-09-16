@@ -3,6 +3,9 @@
   "version": "0.0.1",
   "description": "Install node_modules from package.json + package-lock.json",
   "main": "index.js",
+  "scripts": {
+    "build": "rollup -c"
+  },
   "keywords": [
     "npm",
     "package manager",
@@ -16,5 +19,9 @@
   "_forkedFrom": {
     "url": "https://github.com/npm/logical-tree",
     "author": "Kat Marchán"
+  },
+  "devDependencies": {
+    "@rollup/plugin-node-resolve": "^13.0.4",
+    "rollup": "^2.56.3"
   }
 }
