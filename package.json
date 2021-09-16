@@ -1,10 +1,12 @@
 {
   "name": "npm-install-mini",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Install node_modules from package.json + package-lock.json",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "build": "rollup -c"
+    "prepare": "npm run build",
+    "build": "webpack",
+    "build-dev": "webpack --mode development"
   },
   "keywords": [
     "npm",
@@ -12,16 +14,19 @@
     "npm install",
     "pnpm install",
     "minimal",
-    "small"
+    "small",
+    "offline",
+    "embedded",
+    "ci",
+    "clean install",
+    "pnpm",
+    "minimal pnpm"
   ],
-  "license": "ISC",
+  "license": "CC0-1.0",
   "repository": "https://github.com/milahu/npm-install-mini",
-  "_forkedFrom": {
-    "url": "https://github.com/npm/logical-tree",
-    "author": "Kat Marchán"
-  },
   "devDependencies": {
-    "@rollup/plugin-node-resolve": "^13.0.4",
-    "rollup": "^2.56.3"
+    "snyk-nodejs-lockfile-parser": "git+https://github.com/milahu/nodejs-lockfile-parser.git#fix-TS2571",
+    "webpack": "^5.53.0",
+    "webpack-cli": "^4.8.0"
   }
 }

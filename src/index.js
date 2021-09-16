@@ -1,6 +1,11 @@
 const startTime = Date.now();
 
-import { lockTree } from './lockTree.js';
+import { buildDepTree, LockfileType } from 'snyk-nodejs-lockfile-parser';
+// rollup fails to bundle this, cos circular deps https://github.com/rollup/rollup/issues/3805
+// add integrity fields
+// https://github.com/snyk/nodejs-lockfile-parser/pull/112
+// fix typescript build
+// https://github.com/abdulhannanali/nodejs-lockfile-parser/pull/1
 
 import * as fs from 'fs';
 import * as child_process from 'child_process';
@@ -38,7 +43,7 @@ const symlink = (linkPath, linkTarget) => {
   fs.symlinkSync(linkTarget, linkPath);
 };
 
-function npm_install_mini() {
+async function npm_install_mini() {
 
   const pkg = json('package.json');
   const pkgLock = json('package-lock.json');
@@ -47,25 +52,71 @@ function npm_install_mini() {
   // header
   console.log(`${pkg.name}@${pkg.version}: install NPM dependencies`)
 
-  const deptree = lockTree(pkg, pkgLock);
+  const lockfileDefaultList = [ 'yarn.lock', 'package-lock.json' ];
+  const lockfileTypeOfName = {
+    'package-lock.json': LockfileType.npm,
+    'yarn.lock': LockfileType.yarn,
+  };
+  let lockfilePath = process.env.NODE_lockfilePath || null;
+  if (!lockfilePath) {
+    debug('auto-detect lockfile')
+    for (const p of lockfileDefaultList) {
+      if (!fs.existsSync(p)) continue;
+      lockfilePath = p;
+      debug(`found lockfile ${p}`)
+      break;
+    }
+    if (!lockfilePath) throw 'not found lockfile';
+  }
+
+  const deptree = await buildDepTree( // https://github.com/snyk/nodejs-lockfile-parser/blob/master/lib/index.ts
+    read('package.json'),
+    read(lockfilePath),
+    true, // includeDev: devDependencies are required for build
+    lockfileTypeOfName[path.basename(lockfilePath)],
+    true, // strictOutOfSync
+  );
+
+  function walk_deptree(_this, enter, _seen, deptreePath = []) {
+    /* this would deduplicate
+    if (!_seen) { _seen = new Set() }
+    if (_seen.has(_this)) { return }
+    _seen.add(_this)
+    */
+    enter(_this, function recurse() {
+      for (let key in _this.dependencies) {
+        walk_deptree(_this.dependencies[key], enter, _seen, deptreePath.concat([_this]))
+      }
+    }, deptreePath)
+  }
 
   const store_dir = '.pnpm';
   const doneUnpack = new Set();
   const doneScripts = new Set();
   let numTicks = 0;
   const ticksPerLine = 50;
+  const showTicks = false;
 
-  deptree.forEach((dep, recurse, depTreePath) => {
+  walk_deptree(deptree, function enter(dep, recurse, deptreePath) {
 
-    debug(`dep = ${dep.name}@${dep.version}`);
-    debug(`depTreePath ${depTreePath.map(dep => `${dep.name}@${dep.version}`).join(' / ')}`);
+    // TODO write to logfile. printing many lines to terminal is slow
+    debug(`+ ${deptreePath.slice(1).concat([dep]).map(d => `${d.name}@${d.version}`).join(' ')}`);
+    //if (!enableDebug) console.log(`${deptreePath.map(_ => `+ `).join('')}${dep.name}@${dep.version}`);
+    // output on:  @nodegui/nodegui@0.37.3: installed 535 NPM dependencies in 37.51 seconds
+    // output off: 
 
-    process.stdout.write('.'); // tick
-    numTicks++;
-    if (numTicks % ticksPerLine == 0) process.stdout.write('\n');
+    if (showTicks) {
+      process.stdout.write('.'); // tick
+      numTicks++;
+      if (numTicks % ticksPerLine == 0) process.stdout.write('\n');
+    }
 
-    if (dep.dev) return; // ignore devDependencies
-    // TODO install devDependencies for root package's lifecycle scripts: prepare prepublish (TODO verify)
+    const isRootDep = (deptreePath.length == 1); // dep is a "root dependency" = required by the root package
+
+    dep.nameVersion = `${dep.name}@${dep.version}`;
+    if (!enableDebug && isRootDep) {
+      console.log(`+ ${dep.nameVersion}`);
+    }
 
     if (!dep.resolved) {
       // root package
@@ -79,10 +130,8 @@ function npm_install_mini() {
           // quick n dirty. we use npm to resolve binary paths. we could use require.resolve
         }
       }
-      return; // root package: nothing to unpack
+      return; // root package: nothing to unpack. dependencies are installed in recurse
     }
-
-    //console.dir(dep);
 
     const tgzpath = dep.resolved.replace(/^file:\/\//, '');
 
@@ -91,39 +140,45 @@ function npm_install_mini() {
       // this is used in npmlock2nix, so all dep.resolved should start with file:///nix/store/
     }
 
-    const isRootDep = (depTreePath.length == 1);
+    const parent = deptreePath[deptreePath.length - 1];
+    parent.nameVersion = `${parent.name}@${parent.version}`;
+    parent.nameVersionStore = parent.nameVersion.replace(/[/]/g, '+'); // escape / with + like pnpm
 
-    const parent = depTreePath[depTreePath.length - 1];
+    dep.nameVersion = `${dep.name}@${dep.version}`;
+    dep.nameVersionStore = dep.nameVersion.replace(/[/]/g, '+'); // escape / with + like pnpm
+
+    // nameVersionStore: in the first level of store_dir, all names are escaped
 
     const dep_path = (isRootDep
       ? `node_modules/${dep.name}`
-      : `node_modules/${store_dir}/${parent.name}@${parent.version}/node_modules/${dep.name}`
-    );
-    
-    // we need ../../ (not ../) cos the linkPath is treated as directory (not file)
-    const dep_target = (dep.name.includes('/') ? '../../' : '') + (isRootDep
-        ? `${store_dir}/${dep.name}@${dep.version}/node_modules/${dep.name}`
-      : `../../${dep.name}@${dep.version}/node_modules/${dep.name}`
+      : `node_modules/${store_dir}/${parent.nameVersionStore}/node_modules/${dep.name}`
     );
 
-    const dep_store = `node_modules/${store_dir}/${dep.name}@${dep.version}/node_modules/${dep.name}`
+    dep.nameEscaped = dep.name.replace(/[/]/g, '+'); // escape / with + like pnpm
+    const dep_target = (dep.name.includes('/') ? '../' : '') + (isRootDep
+    //const dep_target = (isRootDep
+        ? `${store_dir}/${dep.nameVersionStore}/node_modules/${dep.name}`
+      : `../../${dep.nameVersionStore}/node_modules/${dep.name}`
+    );
 
-    /*
+    const dep_store = `node_modules/${store_dir}/${dep.nameVersionStore}/node_modules/${dep.name}`;
+
+    (enableDebug &&
     console.dir({
       name: dep.name,
       version: dep.version,
-      parents: path.map(dep => `${dep.name}@${dep.version}`),
+      parents: deptreePath.map(d => `${d.name}@${d.version}`),
       unpack: [tgzpath, dep_store],
       symlink: [dep_target, dep_path],
-    });
-    */
+    })
+    );
 
-    if (doneUnpack.has(`${dep.name}@${dep.version}`)) {
-      debug(`already unpacked: ${dep.name}@${dep.version}`);
+    if (doneUnpack.has(dep.nameVersion)) {
+      debug(`already unpacked: ${dep.nameVersion}`);
     }
     else {
       unpack(tgzpath, dep_store);
-      doneUnpack.add(`${dep.name}@${dep.version}`);
+      doneUnpack.add(dep.nameVersion);
     }
 
     if (!fs.existsSync(dep_path)) {
@@ -143,9 +198,9 @@ function npm_install_mini() {
 
     if (isRootDep) {
       // install binaries. for this we must read the dep's package.json
-      const dep_store_rel = `../${store_dir}/${dep.name}@${dep.version}/node_modules/${dep.name}`
+      const dep_store_rel = `../${store_dir}/${dep.nameVersionStore}/node_modules/${dep.name}`
       const pkg = json(`${dep_store}/package.json`);
-      const deep_dir = `node_modules/${store_dir}/${dep.name}@${dep.version}/node_modules/${dep.name}`;
+      const deep_dir = `node_modules/${store_dir}/${dep.nameVersionStore}/node_modules/${dep.name}`;
       if (typeof pkg.bin == 'string') {
         symlink(`node_modules/.bin/${dep.name}`, `${dep_store_rel}/${pkg.bin}`)
         symlink(`${deep_dir}/node_modules/.bin/${dep.name}`, `../../${pkg.bin}`)
@@ -179,7 +234,7 @@ function npm_install_mini() {
 
     // run lifecycle scripts for dependency
     // run scripts after recurse, so that child-dependencies are installed
-    if (doneScripts.has(`${dep.name}@${dep.version}`)) {
+    if (doneScripts.has(dep.nameVersion)) {
       debug(`already done scripts: ${dep.name}@${dep.version}`);
     }
     else {
@@ -193,18 +248,18 @@ function npm_install_mini() {
           const spawnResult = spawn(['npm', 'run', scriptName], {
             cwd: dep_store,
             env: {
-              NODE_PATH: `/build/node_modules/${store_dir}/${dep.name}@${dep.version}`, // resolve child-dependencies
+              NODE_PATH: `/build/node_modules/${store_dir}/${dep.nameVersionStore}`, // resolve child-dependencies
             }
           });
           if (spawnResult.status > 0) throw `ERROR in ${pkg.name}@${pkg.version} ${scriptName}`
         }
       }
-      doneScripts.add(`${dep.name}@${dep.version}`);
+      doneScripts.add(dep.nameVersion);
     }
   })
 
   // summary
-  process.stdout.write('\n'); // newline after ticks
+  if (showTicks) process.stdout.write('\n'); // newline after ticks
   const deltaTime = (Date.now() - startTime) / 1000;
   console.log(`${pkg.name}@${pkg.version}: installed ${doneUnpack.size} NPM dependencies in ${deltaTime.toFixed(2)} seconds`)
 }
