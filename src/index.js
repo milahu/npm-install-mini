@@ -8,6 +8,7 @@ const read = path => fs.readFileSync(path, 'utf8');
 const json = path => JSON.parse(read(path));
 const mkdir = path => fs.mkdirSync(path, { recursive: true });
 const spawn = args => child_process.spawnSync(args[0], args.slice(1), { stdio: 'inherit', });
+const chmod = fs.chmodSync;
 
 const unpack = (archive, to) => {
   mkdir(to);
@@ -27,7 +28,7 @@ const symlink = (from, to) => {
   fs.symlinkSync(from, to);
 };
 
-export function npm_install_mini() {
+function npm_install_mini() {
 
   const pkg = json('package.json');
   const pkgLock = json('package-lock.json');
@@ -127,3 +128,5 @@ export function npm_install_mini() {
     recurse();
   })
 }
+
+npm_install_mini();
