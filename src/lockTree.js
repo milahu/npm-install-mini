@@ -1,6 +1,4 @@
-'use strict'
-
-let path
+import * as path from 'path'
 
 class LogicalTree {
   constructor (name, address, opts) {
@@ -39,7 +37,6 @@ class LogicalTree {
       // The address of the root is the prefix itself.
       return prefix || ''
     } else {
-      if (!path) { path = require('path') }
       return path.join(
         prefix || '',
         'node_modules',
@@ -97,8 +94,7 @@ class LogicalTree {
   }
 }
 
-module.exports.lockTree = lockTree
-function lockTree (pkg, pkgLock, opts) {
+export function lockTree (pkg, pkgLock, opts) {
   const tree = makeNode(pkg.name, null, pkg)
   const allDeps = new Map()
   Array.from(
@@ -116,12 +112,11 @@ function lockTree (pkg, pkgLock, opts) {
   return tree
 }
 
-module.exports.node = makeNode
-function makeNode (name, address, opts) {
+export function makeNode (name, address, opts) {
   return new LogicalTree(name, address, opts || {})
 }
 
-function addChild (dep, tree, allDeps, pkgLock) {
+export function addChild (dep, tree, allDeps, pkgLock) {
   tree.addDep(dep)
   allDeps.set(dep.address, dep)
   const addr = dep.address
@@ -142,8 +137,7 @@ function addChild (dep, tree, allDeps, pkgLock) {
   })
 }
 
-module.exports._reqAddr = reqAddr
-function reqAddr (pkgLock, name, fromAddr) {
+export function reqAddr (pkgLock, name, fromAddr) {
   const lockNode = atAddr(pkgLock, fromAddr)
   const child = (lockNode.dependencies || {})[name]
   if (child) {
@@ -169,8 +163,7 @@ function reqAddr (pkgLock, name, fromAddr) {
   }
 }
 
-module.exports._atAddr = atAddr
-function atAddr (pkgLock, addr) {
+export function atAddr (pkgLock, addr) {
   if (!addr.length) { return pkgLock }
   const parts = addr.split(':')
   return parts.reduce((acc, next) => {
