@@ -1,3 +1,5 @@
+const startTime = Date.now();
+
 import { lockTree } from './lockTree.js';
 
 import * as fs from 'fs';
@@ -10,9 +12,12 @@ const mkdir = path => fs.mkdirSync(path, { recursive: true });
 const spawn = (args, opts) => child_process.spawnSync(args[0], args.slice(1), { stdio: 'inherit', ...opts });
 const chmod = fs.chmodSync;
 
+const enableDebug = false;
+const debug = enableDebug ? console.log : () => null;
+
 const unpack = (archive, to) => {
   mkdir(to);
-  //console.log(`unpack: ${archive} -> ${to}`);
+  debug(`unpack: ${archive} -> ${to}`);
   spawn([
     'tar',
     '-x',
@@ -24,7 +29,7 @@ const unpack = (archive, to) => {
 
 const symlink = (from, to) => {
   mkdir(path.dirname(to));
-  //console.log(`symlink: ${from} -> ${to}`);
+  debug(`symlink: ${from} -> ${to}`);
   fs.symlinkSync(from, to);
 };
 
@@ -33,16 +38,25 @@ function npm_install_mini() {
   const pkg = json('package.json');
   const pkgLock = json('package-lock.json');
 
+  // header
+  console.log(`${pkg.name}@${pkg.version}: install NPM dependencies`)
+
   const deptree = lockTree(pkg, pkgLock);
 
   const store_dir = '.pnpm';
   const doneUnpack = new Set();
   const doneScripts = new Set();
+  let numTicks = 0;
+  const ticksPerLine = 50;
 
   deptree.forEach((dep, recurse, path) => {
 
-    //console.log(`dep = ${dep.name}@${dep.version}`);
-    //console.log(`path ${path.map(dep => `${dep.name}@${dep.version}`).join(' / ')}`);
+    debug(`dep = ${dep.name}@${dep.version}`);
+    debug(`path ${path.map(dep => `${dep.name}@${dep.version}`).join(' / ')}`);
+
+    process.stdout.write('.'); // tick
+    numTicks++;
+    if (numTicks % ticksPerLine == 0) process.stdout.write('\n');
 
     if (dep.dev) return; // ignore devDependencies
     // TODO install devDependencies for root package's lifecycle scripts: prepare prepublish (TODO verify)
@@ -54,6 +68,7 @@ function npm_install_mini() {
       if (pkg.scripts) {
         for (const script of ['preinstall', 'install', 'postinstall', 'prepublish', 'preprepare', 'prepare', 'postprepare']) {
           if (!(script in pkg.scripts)) continue;
+          console.log(`> ${pkg.name}@${pkg.version} ${script}`)
           spawn(['npm', 'run', script]);
           // quick n dirty. we use npm to resolve binary paths. we could use require.resolve
         }
@@ -97,7 +112,7 @@ function npm_install_mini() {
     */
 
     if (doneUnpack.has(`${dep.name}@${dep.version}`)) {
-      console.log(`already unpacked: ${dep.name}@${dep.version}`);
+      debug(`already unpacked: ${dep.name}@${dep.version}`);
     }
     else {
       unpack(tgzpath, dep_store);
@@ -145,13 +160,14 @@ function npm_install_mini() {
     // run lifecycle scripts for dependency
     // run scripts after recurse, so that child-dependencies are installed
     if (doneScripts.has(`${dep.name}@${dep.version}`)) {
-      console.log(`already done scripts: ${dep.name}@${dep.version}`);
+      debug(`already done scripts: ${dep.name}@${dep.version}`);
     }
     else {
       const pkg = json(`${dep_store}/package.json`);
       if (pkg.scripts) {
         for (const script of ['preinstall', 'install', 'postinstall']) {
           if (!(script in pkg.scripts)) continue;
+          console.log(`> ${pkg.name}@${pkg.version} ${script}`)
           spawn(['npm', 'run', script], { cwd: dep_store });
           // quick n dirty. we use npm to resolve binary paths. we could use require.resolve
         }
@@ -159,6 +175,11 @@ function npm_install_mini() {
       doneScripts.add(`${dep.name}@${dep.version}`);
     }
   })
+
+  // summary
+  process.stdout.write('\n'); // newline after ticks
+  const deltaTime = (Date.now() - startTime) / 1000;
+  console.log(`${pkg.name}@${pkg.version}: installed ${doneUnpack.size} NPM dependencies in ${deltaTime.toFixed(2)} seconds`)
 }
 
 npm_install_mini();
