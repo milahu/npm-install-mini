@@ -74,7 +74,7 @@ function npm_install_mini() {
       if (pkg.scripts) {
         for (const script of ['preinstall', 'install', 'postinstall', 'prepublish', 'preprepare', 'prepare', 'postprepare']) {
           if (!(script in pkg.scripts)) continue;
-          console.log(`> ${pkg.name}@${pkg.version} ${script}`)
+          console.log(`> ${pkg.name}@${pkg.version} ${script}: ${pkg.scripts[script]}`)
           spawn(['npm', 'run', script]);
           // quick n dirty. we use npm to resolve binary paths. we could use require.resolve
         }
@@ -187,9 +187,15 @@ function npm_install_mini() {
       if (pkg.scripts) {
         for (const script of ['preinstall', 'install', 'postinstall']) {
           if (!(script in pkg.scripts)) continue;
-          console.log(`> ${pkg.name}@${pkg.version} ${script}`)
-          spawn(['npm', 'run', script], { cwd: dep_store });
+          console.log(`> ${pkg.name}@${pkg.version} ${script}: ${pkg.scripts[script]}`)
           // quick n dirty. we use npm to resolve binary paths. we could use require.resolve
+          const spawnResult = spawn(['npm', 'run', script], {
+            cwd: dep_store,
+            env: {
+              NODE_PATH: `/build/node_modules/${store_dir}/${dep.name}@${dep.version}`, // resolve child-dependencies
+            }
+          });
+          if (spawnResult.status > 0) throw `ERROR in ${pkg.name}@${pkg.version} ${script}`
         }
       }
       doneScripts.add(`${dep.name}@${dep.version}`);
