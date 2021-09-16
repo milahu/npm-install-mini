@@ -72,10 +72,10 @@ function npm_install_mini() {
       recurse();
       // run lifecycle scripts for root package
       if (pkg.scripts) {
-        for (const script of ['preinstall', 'install', 'postinstall', 'prepublish', 'preprepare', 'prepare', 'postprepare']) {
-          if (!(script in pkg.scripts)) continue;
-          console.log(`> ${pkg.name}@${pkg.version} ${script}: ${pkg.scripts[script]}`)
-          spawn(['npm', 'run', script]);
+        for (const scriptName of ['preinstall', 'install', 'postinstall', 'prepublish', 'preprepare', 'prepare', 'postprepare']) {
+          if (!(scriptName in pkg.scripts)) continue;
+          console.log(`> ${pkg.name}@${pkg.version} ${script}: ${pkg.scripts[scriptName]}`)
+          spawn(['npm', 'run', scriptName]);
           // quick n dirty. we use npm to resolve binary paths. we could use require.resolve
         }
       }
@@ -185,18 +185,18 @@ function npm_install_mini() {
     else {
       const pkg = json(`${dep_store}/package.json`);
       if (pkg.scripts) {
-        for (const script of ['preinstall', 'install', 'postinstall']) {
-          if (!(script in pkg.scripts)) continue;
-          console.log(`> ${pkg.name}@${pkg.version} ${script}`)
+        for (const scriptName of ['preinstall', 'install', 'postinstall']) {
+          if (!(scriptName in pkg.scripts)) continue;
+          console.log(`> ${pkg.name}@${pkg.version} ${scriptName}`)
 
           // quick n dirty. we use npm to resolve binary paths. we could use require.resolve
-          const spawnResult = spawn(['npm', 'run', script], {
+          const spawnResult = spawn(['npm', 'run', scriptName], {
             cwd: dep_store,
             env: {
               NODE_PATH: `/build/node_modules/${store_dir}/${dep.name}@${dep.version}`, // resolve child-dependencies
             }
           });
-          if (spawnResult.status > 0) throw `ERROR in ${pkg.name}@${pkg.version} ${script}`
+          if (spawnResult.status > 0) throw `ERROR in ${pkg.name}@${pkg.version} ${scriptName}`
         }
       }
       doneScripts.add(`${dep.name}@${dep.version}`);
