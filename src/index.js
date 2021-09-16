@@ -104,16 +104,18 @@ function npm_install_mini() {
       doneUnpack.add(`${dep.name}@${dep.version}`);
     }
 
-    try {
+    if (!fs.existsSync(dep_path)) {
       symlink(dep_link, dep_path);
     }
-    catch (error) {
-      console.log(`symlink failed: ${error}`);
-      if (fs.existsSync(dep_path)) {
-        const existing_link = fs.readlinkSync(dep_path);
-        if (existing_link != dep_link) {
-          console.log(`ERROR collision: different symlink exists: ${dep_path} -> ${existing_link}`);
-        }
+    else {
+      // symlink exists
+      const old_link = fs.readlinkSync(dep_path);
+      if (old_link != dep_link) {
+        throw [
+          `ERROR symlink collision`,
+          `old symlink: ${dep_path} -> ${old_link}`,
+          `new symlink: ${dep_path} -> ${dep_link}`,
+        ].join('\n');
       }
     }
 
