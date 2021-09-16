@@ -6,9 +6,12 @@ import * as fs from 'fs';
 import * as child_process from 'child_process';
 import * as path from 'path';
 
-const read = path => fs.readFileSync(path, 'utf8');
-const json = path => JSON.parse(read(path));
-const mkdir = path => fs.mkdirSync(path, { recursive: true });
+const read = filePath => fs.readFileSync(filePath, 'utf8');
+const json = filePath => JSON.parse(read(filePath));
+const mkdir = filePath => {
+  debug(`mkdir: ${filePath}`);
+  fs.mkdirSync(filePath, { recursive: true });
+};
 const spawn = (args, opts) => child_process.spawnSync(args[0], args.slice(1), { stdio: 'inherit', ...opts });
 const chmod = fs.chmodSync;
 
@@ -49,10 +52,10 @@ function npm_install_mini() {
   let numTicks = 0;
   const ticksPerLine = 50;
 
-  deptree.forEach((dep, recurse, path) => {
+  deptree.forEach((dep, recurse, depTreePath) => {
 
     debug(`dep = ${dep.name}@${dep.version}`);
-    debug(`path ${path.map(dep => `${dep.name}@${dep.version}`).join(' / ')}`);
+    debug(`depTreePath ${depTreePath.map(dep => `${dep.name}@${dep.version}`).join(' / ')}`);
 
     process.stdout.write('.'); // tick
     numTicks++;
@@ -85,11 +88,11 @@ function npm_install_mini() {
       // this is used in npmlock2nix, so all dep.resolved should start with file:///nix/store/
     }
 
-    const isRootDop = (path.length == 1);
+    const isRootDep = (depTreePath.length == 1);
 
-    const parent = path[path.length - 1];
+    const parent = depTreePath[depTreePath.length - 1];
 
-    const dep_path = (isRootDop
+    const dep_path = (isRootDep
       ? `node_modules/${dep.name}`
       : `node_modules/${store_dir}/${parent.name}@${parent.version}/node_modules/${dep.name}`
     );
@@ -134,7 +137,7 @@ function npm_install_mini() {
       }
     }
 
-    if (isRootDop) {
+    if (isRootDep) {
       // install binaries. for this we must read the dep's package.json
       const dep_store_rel = `../${store_dir}/${dep.name}@${dep.version}/node_modules/${dep.name}`
       const pkg = json(`${dep_store}/package.json`);
