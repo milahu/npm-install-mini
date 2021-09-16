@@ -12,7 +12,7 @@ const chmod = fs.chmodSync;
 
 const unpack = (archive, to) => {
   mkdir(to);
-  console.log(`unpack: ${archive} -> ${to}`);
+  //console.log(`unpack: ${archive} -> ${to}`);
   spawn([
     'tar',
     '-x',
@@ -24,7 +24,7 @@ const unpack = (archive, to) => {
 
 const symlink = (from, to) => {
   mkdir(path.dirname(to));
-  console.log(`symlink: ${from} -> ${to}`);
+  //console.log(`symlink: ${from} -> ${to}`);
   fs.symlinkSync(from, to);
 };
 
@@ -41,9 +41,8 @@ function npm_install_mini() {
 
   deptree.forEach((dep, recurse, path) => {
 
-    console.log(`dep = ${dep.name}@${dep.version}`);
-    console.log(`path ${path.map(dep => `${dep.name}@${dep.version}`).join(' / ')}`);
-    console.log(`address ${dep.address}`);
+    //console.log(`dep = ${dep.name}@${dep.version}`);
+    //console.log(`path ${path.map(dep => `${dep.name}@${dep.version}`).join(' / ')}`);
 
     if (dep.dev) return; // ignore devDependencies
     // TODO install devDependencies for root package's lifecycle scripts: prepare prepublish (TODO verify)
