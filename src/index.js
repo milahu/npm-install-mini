@@ -7,7 +7,7 @@ import * as path from 'path';
 const read = path => fs.readFileSync(path, 'utf8');
 const json = path => JSON.parse(read(path));
 const mkdir = path => fs.mkdirSync(path, { recursive: true });
-const spawn = args => child_process.spawnSync(args[0], args.slice(1), { stdio: 'inherit', });
+const spawn = (args, opts) => child_process.spawnSync(args[0], args.slice(1), { stdio: 'inherit', ...opts });
 const chmod = fs.chmodSync;
 
 const unpack = (archive, to) => {
@@ -37,6 +37,7 @@ function npm_install_mini() {
 
   const store_dir = '.pnpm';
   const doneUnpack = new Set();
+  const doneScripts = new Set();
 
   deptree.forEach((dep, recurse, path) => {
 
@@ -45,8 +46,21 @@ function npm_install_mini() {
     console.log(`address ${dep.address}`);
 
     if (dep.dev) return; // ignore devDependencies
+    // TODO install devDependencies for root package's lifecycle scripts: prepare prepublish (TODO verify)
 
-    if (!dep.resolved) return recurse(); // root package: nothing to install
+    if (!dep.resolved) {
+      // root package
+      recurse();
+      // run lifecycle scripts for root package
+      if (pkg.scripts) {
+        for (const script of ['preinstall', 'install', 'postinstall', 'prepublish', 'preprepare', 'prepare', 'postprepare']) {
+          if (!(script in pkg.scripts)) continue;
+          spawn(['npm', 'run', script]);
+          // quick n dirty. we use npm to resolve binary paths. we could use require.resolve
+        }
+      }
+      return; // root package: nothing to unpack
+    }
 
     //console.dir(dep);
 
@@ -126,6 +140,23 @@ function npm_install_mini() {
     }
 
     recurse();
+
+    // run lifecycle scripts for dependency
+    // run scripts after recurse, so that child-dependencies are installed
+    if (doneScripts.has(`${dep.name}@${dep.version}`)) {
+      console.log(`already done scripts: ${dep.name}@${dep.version}`);
+    }
+    else {
+      const pkg = json(`${dep_store}/package.json`);
+      if (pkg.scripts) {
+        for (const script of ['preinstall', 'install', 'postinstall']) {
+          if (!(script in pkg.scripts)) continue;
+          spawn(['npm', 'run', script], { cwd: dep_store });
+          // quick n dirty. we use npm to resolve binary paths. we could use require.resolve
+        }
+      }
+      doneScripts.add(`${dep.name}@${dep.version}`);
+    }
   })
 }
 
