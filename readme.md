@@ -1,8 +1,8 @@
-# npm-install-mini
+# pnpm-install-only
 
 Install node_modules from package.json + package-lock.json
 
-## the npm install algorithm
+## the pnpm install algorithm
 
 1. build dependency tree from `package.json` and `package-lock.json`. this is handled by the [lockTree](src/lockTree.js) function from [npm/logical-tree](https://github.com/npm/logical-tree). the original `npm` would deduplicate "transitive" dependencies and build a flat node_modules, but here we build a deep node_modules with symlinks to a local store in `node_modues/.pnpm/`.
 1. unpack dependencies to the local store `node_modues/.pnpm/`. the `*.tar.gz` files are provided by `npmlock2nix`. to unpack, we call `tar xf package.tar.gz`
@@ -106,3 +106,28 @@ postprepare.txt
 * delete any old node_modules
 * only use locked dependencies from package-lock.json
 * not modify package.json
+
+## tests
+
+todo
+
+this program should produce the same result as `pnpm install`,
+so testing can be as simple as
+
+1. prepare a set of `package.json` and `package-lock.json` files.
+these files must be valid, since this program will do no validation
+1. run this script, move `node_modules` to `node_modules-actual`
+1. run `pnpm import` (to produce a `pnpm-lock.yaml` file) and run `pnpm install`,
+move `node_modules` to `node_modules-expected`
+1. compare the two folders with `diff -r node_modules-actual node_modules-expected`
+
+the only difference should be pnpm-internal files,
+like `node_modules/.pnpm/lock.yaml`
+(the [current lockfile](https://github.com/pnpm/pnpm/blob/8e76690f4dcd11d3ac263f565a684d71573ccfeb/packages/lockfile-file/src/write.ts#L142) of pnpm)
+
+## non-standard behavior
+
+> this program should produce the same result as `pnpm install`
+
+except for obvious bugs in pnpm, like [pnpm does not install peerDependencies like npm v7](https://github.com/pnpm/pnpm/issues/827).
+in this case, `npm` (the original nodejs package manager) defines the expected behavior
