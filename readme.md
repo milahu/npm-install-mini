@@ -131,3 +131,45 @@ like `node_modules/.pnpm/lock.yaml`
 
 except for obvious bugs in pnpm, like [pnpm does not install peerDependencies like npm v7](https://github.com/pnpm/pnpm/issues/827).
 in this case, `npm` (the original nodejs package manager) defines the expected behavior
+
+update: `pnpm` has [now implemented](https://github.com/pnpm/pnpm/discussions/3995#discussioncomment-1958472)
+the option [auto-install-peers](https://pnpm.io/npmrc#auto-install-peers)
+
+```
+pnpm config set auto-install-peers true
+```
+
+but this is NOT satisfying,
+because it has NO effect on `pnpm install`.
+it only has an effect on `pnpm add some-package`
+
+so currently, `pnpm` can NOT be used as a drop-in replacement for npmv7
+
+(and thanks to the
+[insane complexity](https://gist.github.com/amcdnl/b52e9dd11850eeb8de8f?permalink_comment_id=4056528#gistcomment-4056528)
+of pnpm, its
+[hard to add this feature](https://github.com/pnpm/pnpm/discussions/3995#discussioncomment-1893883))
+
+workaround: add a pnpm hook
+
+https://github.com/pnpm/pnpm/discussions/3995#discussioncomment-1647425
+
+```js
+// .pnpmfile.cjs
+
+function readPackage(pkg) {
+  pkg.dependencies = {
+    ...pkg.peerDependencies,
+    ...pkg.dependencies,
+  }
+  pkg.peerDependencies = {};
+
+  return pkg;
+}
+
+module.exports = {
+  hooks: {
+    readPackage,
+  },
+};
+```
