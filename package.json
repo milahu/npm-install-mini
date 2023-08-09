@@ -1,13 +1,9 @@
 {
-  "name": "npm-install-mini",
-  "version": "0.0.2",
-  "description": "Install node_modules from package.json + package-lock.json",
-  "main": "dist/index.js",
-  "scripts": {
-    "prepare": "npm run build",
-    "build": "webpack",
-    "build-dev": "webpack --mode development"
-  },
+  "name": "npm-install-only",
+  "version": "0.0.3",
+  "description": "minimal implementation of 'pnpm install'",
+  "main": "src/index.js",
+  "type": "module",
   "keywords": [
     "npm",
     "package manager",
@@ -23,10 +19,8 @@
     "minimal pnpm"
   ],
   "license": "CC0-1.0",
-  "repository": "https://github.com/milahu/npm-install-mini",
+  "repository": "https://github.com/milahu/npm-install-only",
   "devDependencies": {
-    "snyk-nodejs-lockfile-parser": "^1.52.1",
-    "webpack": "^5.88.2",
-    "webpack-cli": "^5.1.4"
+    "snyk-nodejs-lockfile-parser": "^1.52.1"
   }
 }
