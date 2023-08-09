@@ -1,3 +1,5 @@
+#! /usr/bin/env node
+
 const startTime = Date.now();
 
 import { buildDepTree, LockfileType } from 'snyk-nodejs-lockfile-parser';
