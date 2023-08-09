@@ -25,8 +25,8 @@
   "license": "CC0-1.0",
   "repository": "https://github.com/milahu/npm-install-mini",
   "devDependencies": {
-    "snyk-nodejs-lockfile-parser": "^1.37.2",
-    "webpack": "^5.53.0",
-    "webpack-cli": "^4.8.0"
+    "snyk-nodejs-lockfile-parser": "^1.52.1",
+    "webpack": "^5.88.2",
+    "webpack-cli": "^5.1.4"
   }
 }
