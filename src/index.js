@@ -2,7 +2,7 @@
 
 const startTime = Date.now();
 
-import { buildDepTree, LockfileType } from 'snyk-nodejs-lockfile-parser';
+import { buildDepTree, parseNpmLockV2Project, LockfileType } from 'snyk-nodejs-lockfile-parser';
 // rollup fails to bundle this, cos circular deps https://github.com/rollup/rollup/issues/3805
 // add integrity fields
 // https://github.com/snyk/nodejs-lockfile-parser/pull/112
@@ -45,6 +45,129 @@ const symlink = (linkPath, linkTarget) => {
   fs.symlinkSync(linkTarget, linkPath);
 };
 
+
+
+async function getDepgraph(lockfilePath) {
+  const depgraph = await parseNpmLockV2Project(
+    read('package.json'),
+    read(lockfilePath),
+    {
+      // TODO?
+      includeDevDeps: true,
+      strictOutOfSync: true,
+      includeOptionalDeps: true,
+    }
+  );
+
+  // we need depgraphData to get GraphNode deps
+  // https://github.com/snyk/dep-graph/blob/master/src/core/types.ts
+  const depgraphData = depgraph.toJSON();
+
+  const depgraphNodesById = {};
+  for (const node of depgraphData.graph.nodes) {
+    depgraphNodesById[node.nodeId] = node;
+  }
+  // remove the root node
+  //delete depgraphNodesById['root-node']
+
+  depgraphData.nodesById = depgraphNodesById;
+
+  function walk_depgraph(depgraphData, enter, _seen, depPath = []) {
+    const isRootPkg = depPath.length == 0
+    const node = (isRootPkg
+      ? depgraphData.graph.nodes[0] // root node
+      : depgraphData.nodesById[depPath[depPath.length - 1].nameVersion]
+    )
+
+    const version = node.pkgId.replace(/.*@/, '')
+    const name = node.pkgId.slice(0, -1*version.length - 1)
+
+    const resolved = isRootPkg ? "" : node.info.labels.resolved
+    const integrity = isRootPkg ? "" : node.info.labels.integrity
+
+    const dep = {
+      nameVersion: node.pkgId,
+      name,
+      version,
+      resolved,
+      integrity,
+    }
+
+    /* this would deduplicate
+    if (!_seen) { _seen = new Set() }
+    if (_seen.has(depgraphData)) { return }
+    _seen.add(depgraphData)
+    */
+
+    function recurse() {
+      for (const {nodeId: childNodeId} of node.deps) {
+        if (depPath.find(d => d.nameVersion == childNodeId)) {
+          // found cycle in graph
+          //console.log(`found cycle in graph: ${depPath.map(d => d.nameVersion).join('/')}/${childNodeId}`)
+          return
+        }
+
+        const version = childNodeId.replace(/.*@/, '')
+        const name = childNodeId.slice(0, -1*version.length - 1)
+        const node = depgraphData.nodesById[childNodeId]
+
+        const resolved = node.info.labels.resolved
+        const integrity = node.info.labels.integrity
+
+        const childDep = {
+          nameVersion: childNodeId,
+          name,
+          version,
+          resolved,
+          integrity,
+        }
+
+        walk_depgraph(depgraphData, enter, _seen, depPath.concat([childDep]))
+      }
+    }
+
+    enter(dep, recurse, depPath)
+  }
+
+  return [
+    depgraphData,
+    walk_depgraph,
+  ]
+}
+
+
+
+async function getDeptree(lockfilePath) {
+  const deptree = await buildDepTree( // https://github.com/snyk/nodejs-lockfile-parser/blob/master/lib/index.ts
+    read('package.json'),
+    read(lockfilePath),
+    true, // includeDev: devDependencies are required for build
+    lockfileTypeOfName[path.basename(lockfilePath)],
+    true, // strictOutOfSync
+  );
+
+  function walk_deptree(_this, enter, _seen, depPath = []) {
+    /* this would deduplicate
+    if (!_seen) { _seen = new Set() }
+    if (_seen.has(_this)) { return }
+    _seen.add(_this)
+    */
+    function recurse() {
+      for (let key in _this.dependencies) {
+        walk_deptree(_this.dependencies[key], enter, _seen, depPath.concat([_this]))
+      }
+    }
+    enter(_this, recurse, depPath)
+  }
+
+  return [
+    deptree,
+    walk_deptree,
+  ]
+}
+
+
+
 async function npm_install_mini() {
 
   const pkg = json('package.json');
@@ -68,29 +191,32 @@ async function npm_install_mini() {
       debug(`found lockfile ${p}`)
       break;
     }
-    if (!lockfilePath) throw 'not found lockfile';
+    if (!lockfilePath) throw new Error('not found lockfile');
   }
 
-  const deptree = await buildDepTree( // https://github.com/snyk/nodejs-lockfile-parser/blob/master/lib/index.ts
-    read('package.json'),
-    read(lockfilePath),
-    true, // includeDev: devDependencies are required for build
-    lockfileTypeOfName[path.basename(lockfilePath)],
-    true, // strictOutOfSync
-  );
+  const lockfileContent = read(lockfilePath);
+  const lockfile = JSON.parse(lockfileContent);
 
-  function walk_deptree(_this, enter, _seen, deptreePath = []) {
-    /* this would deduplicate
-    if (!_seen) { _seen = new Set() }
-    if (_seen.has(_this)) { return }
-    _seen.add(_this)
-    */
-    enter(_this, function recurse() {
-      for (let key in _this.dependencies) {
-        walk_deptree(_this.dependencies[key], enter, _seen, deptreePath.concat([_this]))
-      }
-    }, deptreePath)
-  }
+  // npm lockfile version 2 ist not supported by the deptree API
+  // so we must use the depgraph API
+
+  // https://github.com/snyk/nodejs-lockfile-parser
+  //
+  // Dep graph generation supported for:
+  //
+  // - package-lock.json (at Versions 2 and 3)
+  // - yarn.lock
+  //
+  // Legacy dep tree supported for:
+  //
+  // - package-lock.json
+  // - yarn 1 yarn.lock
+  // - yarn 2 yarn.lock
+
+  const [deps, walk_deps] = (
+    lockfile.lockfileVersion == 2 ? await getDepgraph(lockfilePath) :
+    await getDeptree(lockfilePath)
+  )
 
   const store_dir = '.pnpm';
   const doneUnpack = new Set();
@@ -99,11 +225,11 @@ async function npm_install_mini() {
   const ticksPerLine = 50;
   const showTicks = false;
 
-  walk_deptree(deptree, function enter(dep, recurse, deptreePath) {
+  walk_deps(deps, function enter(dep, recurse, depPath) {
 
     // TODO write to logfile. printing many lines to terminal is slow
-    debug(`+ ${deptreePath.slice(1).concat([dep]).map(d => `${d.name}@${d.version}`).join(' ')}`);
-    //if (!enableDebug) console.log(`${deptreePath.map(_ => `+ `).join('')}${dep.name}@${dep.version}`);
+    debug(`+ ${depPath.slice(1).concat([dep]).map(d => `${d.name}@${d.version}`).join(' ')}`);
+    //if (!enableDebug) console.log(`${depPath.map(_ => `+ `).join('')}${dep.name}@${dep.version}`);
     // output on:  @nodegui/nodegui@0.37.3: installed 535 NPM dependencies in 37.51 seconds
     // output off: 
 
@@ -113,7 +239,7 @@ async function npm_install_mini() {
       if (numTicks % ticksPerLine == 0) process.stdout.write('\n');
     }
 
-    const isRootDep = (deptreePath.length == 1); // dep is a "root dependency" = required by the root package
+    const isRootDep = (depPath.length == 1); // dep is a "root dependency" = required by the root package
 
     dep.nameVersion = `${dep.name}@${dep.version}`;
     if (!enableDebug && isRootDep) {
@@ -137,12 +263,17 @@ async function npm_install_mini() {
 
     const tgzpath = dep.resolved.replace(/^file:\/\//, '');
 
-    if (tgzpath[0] != '/') {
-      throw `invalid tgzpath '${tgzpath}'` // https:// ...
+    if (tgzpath[0] != '/' ) {
+
+      // debug
+      //console.log(`invalid tgzpath '${tgzpath}'`);
+      //recurse(); return;
+
+      throw new Error(`invalid tgzpath '${tgzpath}'`) // https:// ...
       // this is used in npmlock2nix, so all dep.resolved should start with file:///nix/store/
     }
 
-    const parent = deptreePath[deptreePath.length - 1];
+    const parent = depPath[depPath.length - 1];
     parent.nameVersion = `${parent.name}@${parent.version}`;
     parent.nameVersionStore = parent.nameVersion.replace(/[/]/g, '+'); // escape / with + like pnpm
 
@@ -169,7 +300,7 @@ async function npm_install_mini() {
     console.dir({
       name: dep.name,
       version: dep.version,
-      parents: deptreePath.map(d => `${d.name}@${d.version}`),
+      parents: depPath.map(d => `${d.name}@${d.version}`),
       unpack: [tgzpath, dep_store],
       symlink: [dep_target, dep_path],
     })
@@ -190,11 +321,11 @@ async function npm_install_mini() {
       // symlink exists
       const old_target = fs.readlinkSync(dep_path);
       if (old_target != dep_target) {
-        throw [
+        throw new Error([
           `ERROR symlink collision`,
           `old symlink: ${dep_path} -> ${old_target}`,
           `new symlink: ${dep_path} -> ${dep_target}`,
-        ].join('\n');
+        ].join('\n'));
       }
     }
 
@@ -253,7 +384,7 @@ async function npm_install_mini() {
               NODE_PATH: `/build/node_modules/${store_dir}/${dep.nameVersionStore}`, // resolve child-dependencies
             }
           });
-          if (spawnResult.status > 0) throw `ERROR in ${pkg.name}@${pkg.version} ${scriptName}`
+          if (spawnResult.status > 0) throw new Error(`ERROR in ${pkg.name}@${pkg.version} ${scriptName}`)
         }
       }
       doneScripts.add(dep.nameVersion);
