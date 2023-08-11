@@ -21,6 +21,6 @@
   "license": "MIT",
   "repository": "https://github.com/milahu/npm-install-only",
   "devDependencies": {
-    "snyk-nodejs-lockfile-parser": "^1.52.1"
+    "snyk-nodejs-lockfile-parser": "github:milahu/nodejs-lockfile-parser"
   }
 }
