@@ -168,6 +168,15 @@ async function getDeptree(lockfilePath) {
 
 
 
+const lockfileDefaultList = [ 'yarn.lock', 'package-lock.json' ];
+
+const lockfileTypeOfName = {
+  'package-lock.json': LockfileType.npm,
+  'yarn.lock': LockfileType.yarn,
+};
+
+
+
 async function npm_install_mini() {
 
   const pkg = json('package.json');
@@ -177,11 +186,6 @@ async function npm_install_mini() {
   // header
   console.log(`${pkg.name}@${pkg.version}: install NPM dependencies`)
 
-  const lockfileDefaultList = [ 'yarn.lock', 'package-lock.json' ];
-  const lockfileTypeOfName = {
-    'package-lock.json': LockfileType.npm,
-    'yarn.lock': LockfileType.yarn,
-  };
   let lockfilePath = process.env.NODE_lockfilePath || null;
   if (!lockfilePath) {
     debug('auto-detect lockfile')
