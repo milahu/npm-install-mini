@@ -71,14 +71,6 @@ function parseShebang(fileText) {
 
 
 
-// TODO allow to override via command line options
-function resolveBinaryPath(name) {
-  // command -v $name
-  // which $name
-}
-
-
-
 async function getDepgraph(lockfilePath) {
   const depgraph = await parseNpmLockV2Project(
     read('package.json'),
