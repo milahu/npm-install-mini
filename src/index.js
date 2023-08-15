@@ -481,8 +481,13 @@ async function main() {
     const parent = depPath[depPath.length - 1];
     enableDebug && debug(`${dep.nameVersion}: parent: ${parent.nameVersion}`);
 
-    parent.nameVersion = `${parent.name}@${parent.version}`;
-    parent.nameVersionStore = parent.nameVersion.replace(/[/]/g, '+'); // escape / with + like pnpm
+    const parent = isRootDep ? null : depPath[depPath.length - 2];
+    enableDebug && debug(`${dep.nameVersion}: parent: ${parent?.nameVersion}`);
+
+    if (parent) {
+      parent.nameVersion = `${parent.name}@${parent.version}`;
+      parent.nameVersionStore = parent.nameVersion.replace(/[/]/g, '+'); // escape / with + like pnpm
+    }
 
     // nameVersionStore: in the first level of store_dir, all names are escaped
     dep.nameVersionStore = dep.nameVersion.replace(/[/]/g, '+'); // escape / with + like pnpm
