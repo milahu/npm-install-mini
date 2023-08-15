@@ -217,6 +217,15 @@ async function main() {
 
   // TODO use minimist to parse command line options
 
+  if (enableDebug) {
+    const { createRequire } = await import('node:module');
+    const require = createRequire(import.meta.url);
+    for (const name of ['snyk-nodejs-lockfile-parser']) {
+      const path = require.resolve(name);
+      console.log(`pnpm-install-only: using ${name} from ${path}`);
+    }
+  }
+
   // TODO enable debug via command line options
   // allow writing debug output to logfile
 
