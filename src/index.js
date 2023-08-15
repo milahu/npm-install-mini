@@ -89,8 +89,15 @@ async function getDepgraph(lockfilePath) {
 
       strictOutOfSync: true,
 
-      // optional deps have no resolved+integrity values in lockfile
-      includeOptionalDeps: false,
+      // only some optional deps have resolved+integrity values in lockfile
+      // but some packages require optional deps
+      // for example esbuild requires @esbuild/linux-x64
+      // @esbuild/linux-x64 has resolved and integrity values in lockfile
+      // and it has { "cpu": [ "x64" ], "os": [ "linux" ] }
+      // so we install optional deps when
+      // - they have resolved and integrity values
+      // - their cpu and os values match with the target platform
+      includeOptionalDeps: true,
     }
   );
 
@@ -180,6 +187,7 @@ async function getDeptree(lockfilePath) {
     true, // includeDev: devDependencies are required for build
     lockfileTypeOfName[path.basename(lockfilePath)],
     true, // strictOutOfSync
+    // buildDepTree does not support optional deps
   );
 
   async function walk_deptree(_this, enter, _seen, depPath = []) {
@@ -283,6 +291,14 @@ async function main() {
   const showTicks = false;
 
   async function enter(dep, recurse, depPath) {
+
+    // npmlock2nix will filter optional dependencies by cpu and kernel.
+    // removed dependencies have an empty object in the lockfile
+    // so version, resolved, integrity are empty strings
+    if (dep.version == '' && dep.resolved == '') {
+      enableDebug && debug(`${dep.name}: optional dependency was removed from lockfile`);
+      return;
+    }
 
     // TODO write to logfile. printing many lines to terminal is slow
     enableDebug && debug(`+ ${depPath.slice(1).concat([dep]).map(d => `${d.name}@${d.version}`).join(' ')}`);
