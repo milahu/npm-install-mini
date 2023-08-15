@@ -329,9 +329,11 @@ async function main() {
       // fix: sh: line 1: /build/node_modules/.bin/patch-package: cannot execute: required file not found
       // fix: sh: line 1: /build/node_modules/.bin/husky: Permission denied
 
-      console.log(`${dep.nameVersion}: patching binaries in node_modules/.bin/`);
+      const binNameList = fs.existsSync('node_modules/.bin') ? fs.readdirSync('node_modules/.bin') : [];
 
-      for (const binName of fs.readdirSync('node_modules/.bin')) {
+      (binNameList.length > 0) && console.log(`${dep.nameVersion}: patching binaries in node_modules/.bin/`);
+
+      for (const binName of binNameList) {
 
         const binPath = `node_modules/.bin/${binName}`;
         console.log(`${dep.nameVersion}: patching binary ${binPath}`);
