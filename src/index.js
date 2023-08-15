@@ -42,8 +42,8 @@ const unpack = (archive, to) => {
 // all internal symlinks (with targets in the node-modules derivation) should be relative
 
 const symlink = (linkTarget, linkPath) => {
+  enableDebug && debug(`symlink(${linkTarget}, ${linkPath})`);
   mkdir(path.dirname(linkPath));
-  enableDebug && debug(`symlink: ${linkPath} -> ${linkTarget}`);
   fs.symlinkSync(linkTarget, linkPath);
 };
 
@@ -488,7 +488,9 @@ async function main() {
     dep.nameVersionStore = dep.nameVersion.replace(/[/]/g, '+'); // escape / with + like pnpm
 
     const dep_path = (isRootDep
+      // create link node_modules/x with target node_modules/.pnpm/x@1/node_modules/x
       ? `node_modules/${dep.name}`
+      // create link node_modules/.pnpm/parent@1/node_modules/x with target ../../x@1/node_modules/x
       : `node_modules/${store_dir}/${parent.nameVersionStore}/node_modules/${dep.name}`
     );
     enableDebug && debug(`${dep.nameVersion}: dep_path: ${dep_path}`);
@@ -497,7 +499,9 @@ async function main() {
     enableDebug && debug(`${dep.nameVersion}: dep.nameEscaped: ${dep.nameEscaped}`);
 
     const dep_target = (dep.name.includes('/') ? '../' : '') + (isRootDep
-        ? `${store_dir}/${dep.nameVersionStore}/node_modules/${dep.name}`
+      // create link node_modules/x with target node_modules/.pnpm/x@1/node_modules/x
+      ? `${store_dir}/${dep.nameVersionStore}/node_modules/${dep.name}`
+      // create link node_modules/.pnpm/parent@1/node_modules/x with target ../../x@1/node_modules/x
       : `../../${dep.nameVersionStore}/node_modules/${dep.name}`
     );
     enableDebug && debug(`${dep.nameVersion}: dep_target: ${dep_target}`);
@@ -534,22 +538,15 @@ async function main() {
         throw new Error(`invalid directory path '${dep.resolved}' - expected /*`);
       }
 
-      // TODO allow errors? fail on error?
-      //symlink(dep.resolved, dep_store);
-      try {
+      // create link from machine-level store to local .pnpm/ store
+      if (!fs.existsSync(dep_store)) {
         symlink(dep.resolved, dep_store);
-      } catch (e) { console.log(`symlink failed: ${e}`); }
-
-      try {
-        symlink(dep.resolved, dep_store);
-      } catch (e) { console.log(`symlink failed: ${e}`); }
-
+      }
     }
     doneUnpack.add(dep.nameVersion);
 
     // install nested dep
     if (!fs.existsSync(dep_path)) {
-      console.log(`${dep.nameVersion}: ln -s ${dep_target} ${dep_path}`);
       symlink(dep_target, dep_path);
     }
     else {
@@ -569,80 +566,17 @@ async function main() {
       const dep_store_rel = `../${store_dir}/${dep.nameVersionStore}/node_modules/${dep.name}`
       const pkg = json(`${dep_store}/package.json`);
       const deep_dir = `node_modules/${store_dir}/${dep.nameVersionStore}/node_modules/${dep.name}`;
+
       if (typeof pkg.bin == 'string') {
-
-        console.log(`${dep.nameVersion}: ln -s ${dep_store_rel}/${pkg.bin} node_modules/.bin/${dep.name}`);
-        //symlink(`node_modules/.bin/${dep.name}`, `${dep_store_rel}/${pkg.bin}`)
+        // TODO handle collisions
         symlink(`${dep_store_rel}/${pkg.bin}`, `node_modules/.bin/${dep.name}`);
-
-        // TODO why?
-        console.log(`${dep.nameVersion}: ln -s ../../${pkg.bin} ${deep_dir}/node_modules/.bin/${dep.name}`);
-        //symlink(`${deep_dir}/node_modules/.bin/${dep.name}`, `../../${pkg.bin}`)
-        // FIXME `${deep_dir}/node_modules/.bin/${dep.name}` is read-only
-        // Error: EACCES: permission denied, mkdir 'node_modules/.pnpm/react-native@0.66.5/node_modules/react-native/node_modules/.bin'
-        // quickfix: just dont...?
-        // no?
-        //        symlink(`../../${pkg.bin}`, `${deep_dir}/node_modules/.bin/${dep.name}`);
-        console.log(`ln -s ../../${pkg.bin} ${deep_dir}/node_modules/.bin/${dep.name}`);
-        try {
-          symlink(`../../${pkg.bin}`, `${deep_dir}/node_modules/.bin/${dep.name}`);
-        } catch (_) {
-          console.log(`ln failed`);
-        }
-        // read-only
-        // Error: EPERM: operation not permitted, chmod 'node_modules/.pnpm/react-native@0.66.5/node_modules/react-native/./cli.js'
-        // quickfix: just dont...?
-        // no?
-        try {
-          chmod(`${dep_store}/${pkg.bin}`, 0o755) // fix permissions. required for patchShebangs in nixos
-        } catch (_) {
-          console.log(`chmod failed`);
-        }
       }
       else if (typeof pkg.bin == 'object') {
         for (const binName of Object.keys(pkg.bin)) {
-          // TODO resolve realpath for link target
-          // pkg.bin[binName] can be ./cli.js -> should be only cli.js
-
-          // collision:
-          // Error: EEXIST: file already exists, symlink '../.pnpm/@react-native-community+cli@6.4.0/node_modules/@react-native-community/cli/build/bin.js' -> 'node_modules/.bin/react-native'
-
-          console.log(`${dep.nameVersion}: ln -s ${dep_store_rel}/${pkg.bin[binName]} node_modules/.bin/${binName}`);
-          //symlink(`node_modules/.bin/${binName}`, `${dep_store_rel}/${pkg.bin[binName]}`); // TODO handle collisions
-          //symlink(`${dep_store_rel}/${pkg.bin[binName]}`, `node_modules/.bin/${binName}`); // TODO handle collisions
-          try {
-            symlink(`${dep_store_rel}/${pkg.bin[binName]}`, `node_modules/.bin/${binName}`); // TODO handle collisions
-          } catch (error) {
-            // collision?
-            console.log(`failed to create symlink: ln -s ${dep_store_rel}/${pkg.bin[binName]} node_modules/.bin/${binName}: ${error}`);
-          }
-
-          // read-only
-          // Error: EACCES: permission denied, mkdir 'node_modules/.pnpm/react-native-navigation@7.25.1/node_modules/react-native-navigation/node_modules/.bin'
-          // quickfix: just dont...?
-          console.log(`${dep.nameVersion}: ln -s ../../${pkg.bin[binName]} ${deep_dir}/node_modules/.bin/${binName}`);
-          //symlink(`${deep_dir}/node_modules/.bin/${binName}`, `../../${pkg.bin[binName]}`); // TODO handle collisions
-          //symlink(`../../${pkg.bin[binName]}`, `${deep_dir}/node_modules/.bin/${binName}`); // TODO handle collisions
-          try {
-            symlink(`../../${pkg.bin[binName]}`, `${deep_dir}/node_modules/.bin/${binName}`); // TODO handle collisions
-          } catch (_) {
-            console.log(`ln failed`);
-          }
-          //chmod(`${dep_store}/${pkg.bin[binName]}`, 0o755) // fix permissions. required for patchShebangs in nixos
-          try {
-            chmod(`${dep_store}/${pkg.bin[binName]}`, 0o755) // fix permissions. required for patchShebangs in nixos
-          } catch (_) {
-            console.log(`chmod failed`);
-          }
+          // TODO handle collisions
+          symlink(`${dep_store_rel}/${pkg.bin[binName]}`, `node_modules/.bin/${binName}`);
         }
       }
-    }
-
-    if (isRootDep) {
-      // add link from node_modules/x to node_modules/.pnpm/x@1/node_modules/x
-      try {
-        symlink(dep_target, `node_modules/${dep.name}`);
-      } catch (e) { console.log(`symlink failed: ${e}`); }
     }
 
     // install child deps
@@ -661,7 +595,6 @@ async function main() {
           fs.unlinkSync(`${dep_store}/${linkPath}`); // TODO also 'rm -rf' directories
         }
         try {
-          //symlink(`${dep_store}/${linkPath}`, linkTarget);
           symlink(linkTarget, `${dep_store}/${linkPath}`);
         }
         catch (error) {
