@@ -157,7 +157,7 @@ async function getDepgraph(lockfilePath) {
       }
     }
 
-    await enter(dep, recurse, depPath);
+    await enter(dep, recurse, depPath.concat([dep]));
   }
 
   return [
