@@ -585,13 +585,38 @@ async function main() {
       const deep_dir = `node_modules/${store_dir}/${dep.nameVersionStore}/node_modules/${dep.name}`;
 
       if (typeof pkg.bin == 'string') {
-        // TODO handle collisions
-        symlink(`${dep_store_rel}/${pkg.bin}`, `node_modules/.bin/${dep.name}`);
+        const linkPath = `node_modules/.bin/${dep.name}`;
+        const linkTarget = `${dep_store_rel}/${pkg.bin}`;
+        if (!fs.existsSync(linkPath)) {
+          symlink(linkTarget, linkPath);
+        }
+        else {
+          // collision: symlink exists
+          const old_target = fs.readlinkSync(linkPath);
+          if (old_target != linkTarget) {
+            // short path: ../.pnpm/@playwright+test@1.28.1/node_modules/@playwright/test/./cli.js -> @playwright/test/./cli.js
+            const s = str => str.split("/").slice(4).join("/");
+            // TODO collect these warnings and show them again at the end
+            console.log(`WARNING: collision on ${linkPath}: preferring ${s(old_target)} over ${s(linkTarget)}. use (TODO implement) to change this`);
+          }
+        }
       }
       else if (typeof pkg.bin == 'object') {
         for (const binName of Object.keys(pkg.bin)) {
-          // TODO handle collisions
-          symlink(`${dep_store_rel}/${pkg.bin[binName]}`, `node_modules/.bin/${binName}`);
+          const linkPath = `node_modules/.bin/${binName}`;
+          const linkTarget = `${dep_store_rel}/${pkg.bin[binName]}`
+          if (!fs.existsSync(linkPath)) {
+            symlink(linkTarget, linkPath);
+          }
+          else {
+            // collision: symlink exists
+            const old_target = fs.readlinkSync(linkPath);
+            if (old_target != linkTarget) {
+              const s = str => str.split("/").slice(4).join("/");
+              // TODO collect these warnings and show them again at the end
+              console.log(`WARNING: collision on ${linkPath}: preferring ${s(old_target)} over ${s(linkTarget)}. use (TODO implement) to change this`);
+            }
+          }
         }
       }
     }
@@ -668,6 +693,8 @@ async function main() {
   if (showTicks) process.stdout.write('\n'); // newline after ticks
   const deltaTime = (Date.now() - startTime) / 1000;
   console.log(`${pkgNameVersion}: installed ${doneUnpack.size} node modules in ${deltaTime.toFixed(2)} seconds`)
+
+  // TODO print collected warnings
 
   enableDebug && debug(`ls node_modules:`, fs.readdirSync(`node_modules`).join('  '));
   enableDebug && debug(`ls node_modules/.bin:`, fs.readdirSync(`node_modules/.bin`).join('  '));
