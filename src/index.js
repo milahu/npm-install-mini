@@ -212,7 +212,7 @@ async function getDeptree(lockfilePath) {
         await walk_deptree(_this.dependencies[key], enter, _seen, depPath.concat([_this]));
       }
     }
-    await enter(_this, recurse, depPath);
+    await enter(_this, recurse, depPath.concat([_this]));
   }
 
   return [
