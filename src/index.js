@@ -190,6 +190,11 @@ async function getDeptree(lockfilePath) {
     */
     async function recurse() {
       for (let key in _this.dependencies) {
+        if (depPath.find(d => d.name == key)) {
+          //enableDebug && debug(`found cycle in tree: ${depPath.map(d => d.nameVersion).join('  ')}  ${key}`)
+          continue
+        }
+        //enableDebug && debug(`no cycle in tree: ${depPath.map(d => d.nameVersion).join('  ')}  ${key}`)
         await walk_deptree(_this.dependencies[key], enter, _seen, depPath.concat([_this]));
       }
     }
