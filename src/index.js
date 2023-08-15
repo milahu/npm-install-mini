@@ -113,7 +113,7 @@ async function getDepgraph(lockfilePath) {
     const isRootPkg = depPath.length == 0
     const node = (isRootPkg
       ? depgraphData.graph.nodes[0] // root node
-      : null
+      : depgraphData.nodesById[depPath[depPath.length - 1].nameVersion]
     )
 
     const dep = isRootPkg ? {
