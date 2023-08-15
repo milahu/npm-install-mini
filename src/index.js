@@ -106,6 +106,9 @@ async function getDepgraph(lockfilePath) {
 
   depgraphData.nodesById = depgraphNodesById;
 
+  // TODO add function: walk_depgraph_inner
+  // so we can remove all the conditionals with isRootPkg
+
   async function walk_depgraph(depgraphData, enter, _seen, depPath = []) {
     const isRootPkg = depPath.length == 0
     const node = (isRootPkg
