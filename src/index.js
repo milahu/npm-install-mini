@@ -520,16 +520,6 @@ async function main() {
     const dep_store = `node_modules/${store_dir}/${dep.nameVersionStore}/node_modules/${dep.name}`;
     enableDebug && debug(`${dep.nameVersion}: dep_store: ${dep_store}`);
 
-    (enableDebug &&
-    console.dir({
-      name: dep.name,
-      version: dep.version,
-      parents: depPath.map(d => `${d.name}@${d.version}`),
-      unpack: [tgzpath, dep_store],
-      symlink: [dep_target, dep_path],
-    })
-    );
-
     // dep.resolved is tarfile or directory
     // this is used in npmlock2nix, so all dep.resolved should start with file:///nix/store/ or /nix/store/
     // invalid paths start with https:// or git+ssh:// or ...
