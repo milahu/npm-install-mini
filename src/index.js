@@ -15,15 +15,20 @@ import child_process from 'child_process';
 import path from 'path';
 
 const enableDebug = false;
+
 const debug = enableDebug ? console.log : () => null;
 
 const read = filePath => fs.readFileSync(filePath, 'utf8');
+
 const json = filePath => JSON.parse(read(filePath));
+
 const mkdir = filePath => {
   enableDebug && debug(`mkdir: ${filePath}`);
   fs.mkdirSync(filePath, { recursive: true });
 };
+
 const spawn = (args, opts) => child_process.spawnSync(args[0], args.slice(1), { stdio: 'inherit', ...opts });
+
 const chmod = fs.chmodSync;
 
 const unpack = (archive, to) => {
@@ -109,8 +114,12 @@ async function getDepgraph(lockfilePath) {
   // TODO add function: walk_depgraph_inner
   // so we can remove all the conditionals with isRootPkg
 
+
+
   async function walk_depgraph(depgraphData, enter, _seen, depPath = []) {
+
     const isRootPkg = depPath.length == 0
+
     const node = (isRootPkg
       ? depgraphData.graph.nodes[0] // root node
       : depgraphData.nodesById[depPath[depPath.length - 1].nameVersion]
@@ -132,8 +141,12 @@ async function getDepgraph(lockfilePath) {
     _seen.add(depgraphData)
     */
 
+
+
     async function recurse() {
+
       for (const {nodeId: childNodeId} of node.deps) {
+
         if (depPath.find(d => d.nameVersion == childNodeId)) {
           //enableDebug && debug(`found cycle in graph: ${depPath.map(d => d.nameVersion).join('  ')}  ${childNodeId}`)
           continue
@@ -171,7 +184,9 @@ async function getDepgraph(lockfilePath) {
 
 
 async function getDeptree(lockfilePath) {
+
   // https://github.com/snyk/nodejs-lockfile-parser/blob/master/lib/index.ts
+
   const deptree = await buildDepTree(
     read('package.json'),
     read(lockfilePath),
