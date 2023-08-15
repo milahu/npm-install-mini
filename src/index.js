@@ -14,6 +14,9 @@ import fs from 'fs';
 import child_process from 'child_process';
 import path from 'path';
 
+const enableDebug = false;
+const debug = enableDebug ? console.log : () => null;
+
 const read = filePath => fs.readFileSync(filePath, 'utf8');
 const json = filePath => JSON.parse(read(filePath));
 const mkdir = filePath => {
@@ -22,9 +25,6 @@ const mkdir = filePath => {
 };
 const spawn = (args, opts) => child_process.spawnSync(args[0], args.slice(1), { stdio: 'inherit', ...opts });
 const chmod = fs.chmodSync;
-
-const enableDebug = false;
-const debug = enableDebug ? console.log : () => null;
 
 const unpack = (archive, to) => {
   mkdir(to);
