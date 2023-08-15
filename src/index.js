@@ -136,10 +136,10 @@ async function getDepgraph(lockfilePath) {
     async function recurse() {
       for (const {nodeId: childNodeId} of node.deps) {
         if (depPath.find(d => d.nameVersion == childNodeId)) {
-          // found cycle in graph
-          //console.log(`found cycle in graph: ${depPath.map(d => d.nameVersion).join('/')}/${childNodeId}`)
-          return
+          //enableDebug && debug(`found cycle in graph: ${depPath.map(d => d.nameVersion).join('  ')}  ${childNodeId}`)
+          continue
         }
+        //enableDebug && debug(`no cycle in graph: ${depPath.map(d => d.nameVersion).join('  ')}  ${childNodeId}`)
 
         const version = childNodeId.replace(/.*@/, '')
         const name = childNodeId.slice(0, -1*version.length - 1)
