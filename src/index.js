@@ -507,7 +507,7 @@ async function main() {
     // pkg is root dependency or nested dependency
     // isRootPkg == false
 
-    const parent = isRootDep ? null : depPath[depPath.length - 2];
+    const parent = isRootDep ? null : depPath[depPath.length - 1];
     enableDebug && debug(`${dep.nameVersion}: parent: ${parent?.nameVersion}`);
 
     if (parent) {
