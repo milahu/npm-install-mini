@@ -124,8 +124,6 @@ async function getDepgraph(lockfilePath) {
       integrity: '',
     } : depPath[depPath.length - 1]
 
-    if (isRootPkg) depPath[0] = dep;
-
     /* this would deduplicate
     if (!_seen) { _seen = new Set() }
     if (_seen.has(depgraphData)) { return }
