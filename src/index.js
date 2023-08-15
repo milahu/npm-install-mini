@@ -156,7 +156,7 @@ async function getDepgraph(lockfilePath) {
           integrity,
         }
 
-        await walk_depgraph(depgraphData, enter, _seen, depPath.concat([childDep]));
+        await walk_depgraph(depgraphData, enter, _seen, depPath.concat([dep]));
       }
     }
 
