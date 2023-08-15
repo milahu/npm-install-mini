@@ -265,9 +265,15 @@ async function main() {
   // - yarn 2 yarn.lock
 
   const [deps, walk_deps] = (
+    lockfile.lockfileVersion == 3 ? await getDepgraph(lockfilePath) : // TODO verify
     lockfile.lockfileVersion == 2 ? await getDepgraph(lockfilePath) :
-    await getDeptree(lockfilePath)
+    lockfile.lockfileVersion == 1 ? await getDeptree(lockfilePath) :
+    [null, null]
   )
+
+  if (deps == null && walk_deps == null) {
+    throw new Error('failed to recognize the lockfile type');
+  }
 
   const store_dir = '.pnpm';
   const doneUnpack = new Set();
