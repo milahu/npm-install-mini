@@ -110,22 +110,16 @@ async function getDepgraph(lockfilePath) {
     const isRootPkg = depPath.length == 0
     const node = (isRootPkg
       ? depgraphData.graph.nodes[0] // root node
-      : depgraphData.nodesById[depPath[depPath.length - 1].nameVersion]
+      : null
     )
 
-    const version = node.pkgId.replace(/.*@/, '')
-    const name = node.pkgId.slice(0, -1*version.length - 1)
-
-    const resolved = isRootPkg ? "" : node.info.labels.resolved
-    const integrity = isRootPkg ? "" : node.info.labels.integrity
-
-    const dep = {
+    const dep = isRootPkg ? {
       nameVersion: node.pkgId,
-      name,
-      version,
-      resolved,
-      integrity,
-    }
+      name: node.pkgId.replace(/@[^@\/]*$/, ''),
+      version: node.pkgId.replace(/^.*@/, ''),
+      resolved: '',
+      integrity: '',
+    } : depPath[depPath.length - 1]
 
     if (isRootPkg) depPath[0] = dep;
 
