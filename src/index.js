@@ -329,12 +329,12 @@ async function main() {
     dep.nameVersion = `${dep.name}@${dep.version}`;
 
     // dep is a "root dependency" = required by the root package
-    const isRootDep = (depPath.length == 1);
+    const isRootDep = (depPath.length == 2);
     isRootDep && console.log(`+ ${dep.nameVersion}`);
     enableDebug && debug(`${dep.nameVersion}: depPath: ${depPath.map(d => d.nameVersion).join('  ')}`);
     enableDebug && debug(`${dep.nameVersion}: isRootDep: ${isRootDep}`);
 
-    const isRootPkg = (depPath.length == 0);
+    const isRootPkg = (depPath.length == 1);
     enableDebug && debug(`${dep.nameVersion}: isRootPkg: ${isRootPkg}`);
 
     if (isRootPkg) {
