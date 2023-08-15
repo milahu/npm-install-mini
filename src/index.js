@@ -299,18 +299,16 @@ async function main() {
     // TODO default false, use command line option
     const ignoreScripts = true;
 
-    //console.log(`depPath: ${depPath.map(d => d.nameVersion).join('  ')}`);
-
-    const isRootPkg = (depPath.length == 0);
+    dep.nameVersion = `${dep.name}@${dep.version}`;
 
     // dep is a "root dependency" = required by the root package
     const isRootDep = (depPath.length == 1);
+    isRootDep && console.log(`+ ${dep.nameVersion}`);
+    enableDebug && debug(`${dep.nameVersion}: depPath: ${depPath.map(d => d.nameVersion).join('  ')}`);
+    enableDebug && debug(`${dep.nameVersion}: isRootDep: ${isRootDep}`);
 
-    dep.nameVersion = `${dep.name}@${dep.version}`;
-
-    if (!enableDebug && isRootDep) {
-      console.log(`+ ${dep.nameVersion}`);
-    }
+    const isRootPkg = (depPath.length == 0);
+    enableDebug && debug(`${dep.nameVersion}: isRootPkg: ${isRootPkg}`);
 
     if (isRootPkg) {
 
@@ -482,10 +480,8 @@ async function main() {
       return;
     }
 
-    dep.nameVersion = `${dep.name}@${dep.version}`;
-
-    const parent = depPath[depPath.length - 1];
-    enableDebug && debug(`${dep.nameVersion}: parent: ${parent.nameVersion}`);
+    // pkg is root dependency or nested dependency
+    // isRootPkg == false
 
     const parent = isRootDep ? null : depPath[depPath.length - 2];
     enableDebug && debug(`${dep.nameVersion}: parent: ${parent?.nameVersion}`);
@@ -526,6 +522,7 @@ async function main() {
     if (dep.resolved.startsWith("file://")) {
       // dep.resolved is tarfile -> unpack
       const tgzpath = dep.resolved.replace(/^file:\/\//, '');
+      enableDebug && debug(`${dep.nameVersion}: dep_store: ${dep_store}`);
       if (tgzpath[0] != '/' ) {
         console.dir({ dep });
         throw new Error(`invalid tarfile path '${tgzpath}' - expected file:///*.tgz`)
