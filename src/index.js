@@ -6,6 +6,8 @@ const startTime = Date.now();
 // https://github.com/snyk/nodejs-lockfile-parser/pull/112
 // https://github.com/snyk/nodejs-lockfile-parser/pull/199
 
+// note: there is no parseNpmLockV3Project
+
 import { buildDepTree, parseNpmLockV2Project, LockfileType } from 'snyk-nodejs-lockfile-parser';
 
 import which from 'which';
@@ -309,7 +311,7 @@ async function main() {
   // - yarn 2 yarn.lock
 
   const [deps, walk_deps] = (
-    lockfile.lockfileVersion == 3 ? await getDepgraph(lockfilePath) : // TODO verify
+    lockfile.lockfileVersion == 3 ? await getDepgraph(lockfilePath) :
     lockfile.lockfileVersion == 2 ? await getDepgraph(lockfilePath) :
     lockfile.lockfileVersion == 1 ? await getDeptree(lockfilePath) :
     [null, null]
@@ -336,7 +338,11 @@ async function main() {
     // npmlock2nix will filter optional dependencies by cpu and kernel.
     // removed dependencies have an empty object in the lockfile
     // so version, resolved, integrity are empty strings
-    if (dep.version == '' && dep.resolved == '') {
+    if (
+      dep.version == '' &&
+      dep.resolved == '' &&
+      dep.nameVersion != 'package.json@' // v3
+    ) {
       enableDebug && debug(`${dep.name}: optional dependency was removed from lockfile`);
       return;
     }
