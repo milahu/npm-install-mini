@@ -270,6 +270,9 @@ async function main() {
   const pkg = json('package.json');
   const pkgLock = json('package-lock.json');
 
+  if (pkg.name === undefined) pkg.name = "package";
+  if (pkg.version === undefined) pkg.version = "0.0.0";
+
   // passed by npmlock2nix
   // FIXME pass by file
   const preInstallLinks = JSON.parse(process.env.NODE_preInstallLinks || 'null');
