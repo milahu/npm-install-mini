@@ -135,6 +135,11 @@ async function getDepgraph(lockfilePath) {
 
     if (isRootPkg) depPath[0] = dep;
 
+    enableDebug && debug(`walk_depgraph: root node: ${JSON.stringify(node, null, 2)}`);
+    enableDebug && debug(`walk_depgraph: depPath: ${depPath.map(d => d.nameVersion).join('  ')}`)
+    enableDebug && debug(`walk_depgraph: isRootPkg: ${isRootPkg}`);
+    enableDebug && debug(`walk_depgraph: dep: ${JSON.stringify(dep, null, 2)}`);
+
     /* this would deduplicate
     if (!_seen) { _seen = new Set() }
     if (_seen.has(depgraphData)) { return }
@@ -146,6 +151,8 @@ async function getDepgraph(lockfilePath) {
     async function recurse() {
 
       for (const {nodeId: childNodeId} of node.deps) {
+
+        enableDebug && debug(`walk_depgraph: recurse: depPath: ${depPath.map(d => d.nameVersion).join('  ')}  ${childNodeId}`)
 
         if (depPath.find(d => d.nameVersion == childNodeId)) {
           //enableDebug && debug(`found cycle in graph: ${depPath.map(d => d.nameVersion).join('  ')}  ${childNodeId}`)
@@ -307,6 +314,11 @@ async function main() {
     lockfile.lockfileVersion == 1 ? await getDeptree(lockfilePath) :
     [null, null]
   )
+
+  if (enableDebug) {
+    console.log("deps:");
+    console.dir(deps);
+  }
 
   if (deps == null && walk_deps == null) {
     throw new Error('failed to recognize the lockfile type');
@@ -725,7 +737,7 @@ async function main() {
   // TODO print collected warnings
 
   enableDebug && debug(`ls node_modules:`, fs.readdirSync(`node_modules`).join('  '));
-  enableDebug && debug(`ls node_modules/.bin:`, fs.readdirSync(`node_modules/.bin`).join('  '));
+  enableDebug && fs.existsSync(`node_modules/.bin`) && debug(`ls node_modules/.bin:`, fs.readdirSync(`node_modules/.bin`).join('  '));
 }
 
 
