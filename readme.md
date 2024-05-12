@@ -173,3 +173,21 @@ module.exports = {
   },
 };
 ```
+
+
+
+## similar projects
+
+
+
+### js2nix
+
+https://github.com/canva-public/js2nix
+
+<blockquote>
+
+The `nodeModules` is a Nix derivation that contains a compatible with [Node.js module resolution algorithm](https://nodejs.org/api/modules.html#all-together) layout. Note that the layout of the resulting `node_modules` is similar to what [`PNPM`](https://pnpm.io) package manager is providing, that is not a [flat](https://npm.github.io/how-npm-works-docs/npm3/how-npm3-works.html) layout but rather the canonical layout with symlinked (from the Nix store) npm packages into it.
+
+To find out more about the project, its background, implementation details, how to use it please go to the [documentation space](https://github.com/canva-public/js2nix/blob/main/docs/README.md).
+
+</blockquote>
